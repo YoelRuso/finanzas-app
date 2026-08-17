@@ -111,8 +111,17 @@ propósito: así se puede preguntar por una gráfica sin dejar de verla.
 
 ## Categorización de gastos
 
-- Categorías: *pendiente de definir por el usuario* (ejemplos de partida: alimentación, transporte, ocio, suscripciones, vivienda, salud, otros).
-- Estrategia: reglas simples por palabra clave en el concepto de la transacción (ej. "MERCADONA" → alimentación) + fallback a la IA para casos ambiguos.
+- **Categorías:** las 12 de `backend/src/services/categorizer.ts`, duplicadas
+  en `frontend/src/categories.ts` (hay que mantenerlas en sincronía).
+- **Orden de prioridad:** reglas propias del usuario (`CategoryRule`) →
+  reglas por defecto por palabra clave ("MERCADONA" → alimentación) → `otros`.
+- **Propuesta con IA:** lo que cae en `otros` se agrupa por comercio y
+  `POST /category-rules/suggest` le pide a Gemini una categoría para cada uno
+  (`services/categorySuggester.ts`, una sola llamada para toda la lista). La
+  IA **no escribe nada**: propone, y confirmar en pantalla es lo que crea la
+  `CategoryRule`. La guía del prompt repite el criterio de las reglas por
+  defecto (restaurante → ocio, súper → alimentación); si se cambian unas hay
+  que cambiar la otra o las sugerencias contradirán a lo ya clasificado.
 
 ## Tickets de compra (desglose de la cesta)
 

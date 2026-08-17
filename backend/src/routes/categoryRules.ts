@@ -1,5 +1,15 @@
 import { Router, Request, Response } from 'express'
-import { CATEGORIES, isValidCategory } from '../services/categorizer'
+import { CATEGORIES, isValidCategory, merchantKey } from '../services/categorizer'
+import {
+  suggestCategories,
+  MAX_GROUPS,
+  type PendingGroup,
+} from '../services/categorySuggester'
+import {
+  GeminiConfigError,
+  GeminiEmptyError,
+  GeminiApiError,
+} from '../services/gemini'
 import { applyRule } from './transactions'
 import prisma from '../db/client'
 
@@ -62,6 +72,71 @@ router.post('/', async (req: Request, res: Response) => {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     res.status(500).json({ error: message })
+  }
+})
+
+// POST /category-rules/suggest
+// Body: { accountId? }
+// Pide a la IA una categoría para cada comercio que sigue en «otros».
+// No guarda nada: la propuesta se confirma desde la pantalla, comercio a
+// comercio, y es esa confirmación la que crea la regla.
+router.post('/suggest', async (req: Request, res: Response) => {
+  try {
+    const accountId = req.body?.accountId as string | undefined
+
+    const transactions = await prisma.transaction.findMany({
+      where: {
+        category: 'otros',
+        ...(accountId ? { accountId } : {}),
+        // Un traspaso no se clasifica: no es gasto.
+        isTransfer: false,
+      },
+      orderBy: { date: 'desc' },
+      select: { description: true, amount: true },
+    })
+
+    // Mismo agrupado que la lista de pendientes, para que las claves casen.
+    const groups = new Map<string, PendingGroup>()
+    for (const tx of transactions) {
+      const key = merchantKey(tx.description)
+      const group = groups.get(key)
+      if (group) {
+        group.count++
+        group.total += Math.abs(tx.amount)
+      } else {
+        groups.set(key, { key, sample: tx.description, count: 1, total: Math.abs(tx.amount) })
+      }
+    }
+
+    // Primero los comercios donde hay más dinero en juego: si hay más de los
+    // que caben en una llamada, que entren los que más pesan.
+    const pending = Array.from(groups.values())
+      .map((g) => ({ ...g, total: Math.round(g.total * 100) / 100 }))
+      .sort((a, b) => b.total - a.total)
+
+    const { suggestions, model } = await suggestCategories(pending)
+
+    res.json({
+      suggestions,
+      model,
+      /** Comercios que no han entrado en esta tanda. */
+      remaining: Math.max(0, pending.length - MAX_GROUPS),
+    })
+  } catch (err: unknown) {
+    if (err instanceof GeminiConfigError) {
+      res.status(503).json({ error: err.message })
+      return
+    }
+    if (err instanceof GeminiEmptyError) {
+      res.status(502).json({ error: err.message })
+      return
+    }
+    if (err instanceof GeminiApiError) {
+      res.status(err.status).json({ error: err.message })
+      return
+    }
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    res.status(502).json({ error: message })
   }
 })
 

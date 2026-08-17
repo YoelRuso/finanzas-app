@@ -162,6 +162,13 @@ export interface CategoryRule {
   matches?: number
 }
 
+/** Categoría que propone la IA para un comercio sin clasificar. */
+export interface CategorySuggestion {
+  /** Clave del comercio, la misma que trae `PendingGroup`. */
+  key: string
+  category: string
+}
+
 export interface CategorySummary {
   category: string
   total: number
@@ -370,6 +377,20 @@ export const api = {
 
   getCategoryRules: () =>
     apiFetch<{ rules: CategoryRule[]; categories: string[] }>('/category-rules'),
+
+  /**
+   * Pide a la IA una categoría para cada comercio que sigue en «otros».
+   * No guarda nada: propone, y se confirma desde la pantalla.
+   */
+  suggestCategories: (accountId?: string) =>
+    apiFetch<{ suggestions: CategorySuggestion[]; model: string; remaining: number }>(
+      '/category-rules/suggest',
+      {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ accountId }),
+      }
+    ),
 
   createCategoryRule: (keyword: string, category: string) =>
     apiFetch<{ rule: CategoryRule; applied: number }>('/category-rules', {

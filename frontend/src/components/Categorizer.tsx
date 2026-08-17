@@ -25,6 +25,9 @@ export default function Categorizer({ accounts, accountId }: Props) {
   const [keywords, setKeywords] = useState<Record<string, string>>({})
   const [showRules, setShowRules] = useState(false)
   const [toast, setToast] = useState('')
+  const [toastError, setToastError] = useState(false)
+  /** Propuestas de la IA por clave de comercio. Viven solo en pantalla. */
+  const [suggestions, setSuggestions] = useState<Record<string, string>>({})
 
   const { data, isLoading } = useQuery({
     queryKey: ['pending-groups', accountId ?? 'all'],
@@ -53,9 +56,11 @@ export default function Categorizer({ accounts, accountId }: Props) {
     void queryClient.invalidateQueries({ queryKey: ['summary'] })
   }
 
-  function flash(message: string) {
+  function flash(message: string, failed = false) {
     setToast(message)
-    setTimeout(() => setToast(''), 3500)
+    setToastError(failed)
+    // Los fallos de la API traen explicación larga: dan más tiempo de lectura.
+    setTimeout(() => setToast(''), failed ? 8000 : 3500)
   }
 
   const classify = useMutation({
@@ -73,6 +78,29 @@ export default function Categorizer({ accounts, accountId }: Props) {
       invalidateAll()
     },
     onError: () => flash('No se pudo guardar la categoría'),
+  })
+
+  /**
+   * Una sola llamada para todos los comercios pendientes. Lo que vuelve son
+   * propuestas: nada se guarda hasta que se confirma una por una.
+   */
+  const suggest = useMutation({
+    mutationFn: () => api.suggestCategories(accountId),
+    onSuccess: ({ suggestions: proposed, remaining }) => {
+      setSuggestions(
+        Object.fromEntries(proposed.map((s) => [s.key, s.category]))
+      )
+      flash(
+        proposed.length === 0
+          ? 'La IA no ha sabido proponer nada'
+          : `${proposed.length} propuestas${remaining > 0 ? ` · quedan ${remaining} para otra tanda` : ''}`
+      )
+    },
+    onError: (error: unknown) =>
+      flash(
+        error instanceof Error ? error.message : 'No se pudieron pedir propuestas',
+        true
+      ),
   })
 
   const recategorize = useMutation({
@@ -107,7 +135,28 @@ export default function Categorizer({ accounts, accountId }: Props) {
       }
       actions={
         <>
-          {toast && <span className="font-mono text-[11px] text-moss">{toast}</span>}
+          {toast && (
+            <span
+              title={toast}
+              className={`font-mono text-[11px] max-w-[22rem] truncate ${
+                toastError ? 'text-rust' : 'text-moss'
+              }`}
+            >
+              {toast}
+            </span>
+          )}
+
+          {groups.length > 0 && (
+            <button
+              onClick={() => suggest.mutate()}
+              disabled={suggest.isPending || classify.isPending}
+              title="Una llamada a la IA propone categoría para todos los comercios pendientes"
+              className="font-mono text-[11px] tracking-widest uppercase text-brass hover:text-stone disabled:text-dust transition-colors border-b border-brass/40 hover:border-stone disabled:border-transparent pb-px"
+            >
+              {suggest.isPending ? 'Proponiendo…' : 'Proponer con IA'}
+            </button>
+          )}
+
           {accounts.length > 0 && (
             <button
               onClick={() => recategorize.mutate()}
@@ -227,6 +276,7 @@ export default function Categorizer({ accounts, accountId }: Props) {
             const isOpen = expanded === group.key
             const keyword = keywords[group.key] ?? group.key
             const isPending = classify.isPending && classify.variables?.group.key === group.key
+            const suggestion = suggestions[group.key]
 
             return (
               <div key={group.key} className="border-b border-wall last:border-b-0">
@@ -267,6 +317,48 @@ export default function Categorizer({ accounts, accountId }: Props) {
                     ›
                   </span>
                 </button>
+
+                {/*
+                  Propuesta de la IA: un clic la confirma y crea la regla,
+                  igual que si la hubieras elegido a mano. Se esconde al abrir
+                  el grupo, que ahí ya están todas las categorías.
+                */}
+                {!isOpen && suggestion && (
+                  <div className="flex items-center gap-3 flex-wrap pl-[5.75rem] pr-6 pb-3 -mt-1">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-dust">
+                      Propuesta
+                    </span>
+
+                    <span
+                      className="inline-flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded text-[10px] font-mono tracking-wide"
+                      style={{
+                        backgroundColor: `${categoryColor(suggestion)}1A`,
+                        color: categoryColor(suggestion),
+                      }}
+                    >
+                      <CategoryIcon category={suggestion} className="w-3.5 h-3.5" />
+                      {categoryLabel(suggestion)}
+                    </span>
+
+                    <button
+                      onClick={() => classify.mutate({ group, category: suggestion })}
+                      disabled={isPending}
+                      className="font-mono text-[11px] tracking-widest uppercase text-moss hover:text-stone disabled:text-dust transition-colors border-b border-moss/40 hover:border-stone disabled:border-transparent pb-px"
+                    >
+                      {isPending ? 'Aplicando…' : 'Confirmar'}
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        setSuggestions(({ [group.key]: _discarded, ...rest }) => rest)
+                      }
+                      disabled={isPending}
+                      className="font-mono text-[11px] text-dust hover:text-fog transition-colors"
+                    >
+                      descartar
+                    </button>
+                  </div>
+                )}
 
                 {/* expanded picker */}
                 {isOpen && (
