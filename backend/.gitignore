@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+keys/*.pem
+keys/*.key
+# La base de datos guarda los movimientos bancarios reales. SQLite crea
+# además ficheros -wal y -shm al vuelo, y arrastran el mismo contenido.
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+# Fotos de tickets de compra — datos personales, nunca a git.
+uploads/

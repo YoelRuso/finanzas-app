@@ -1,0 +1,159 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  body {
+    background-color: #08080C;
+    color: #F0EDE6;
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: #08080C; }
+  ::-webkit-scrollbar-thumb { background: #31333F; }
+  ::-webkit-scrollbar-thumb:hover { background: #6F6F82; }
+
+  ::selection {
+    background: rgba(212, 184, 122, 0.2);
+    color: #D4B87A;
+  }
+
+  /* Recharts tooltip override */
+  .recharts-tooltip-wrapper {
+    outline: none !important;
+  }
+}
+
+@layer components {
+  /*
+   * Superficie de cada apartado. Ligeramente translúcida para que la rejilla
+   * de puntos del fondo se intuya, con luz superior + sombra proyectada para
+   * despegarla de la página.
+   *
+   * Sin backdrop-filter a propósito: el canvas animado de detrás obligaría a
+   * recalcular el desenfoque de cada panel en cada fotograma.
+   */
+  .panel {
+    @apply bg-slab/90 border border-wall rounded-2xl;
+    box-shadow:
+      inset 0 1px 0 0 rgba(240, 237, 230, 0.045),
+      0 2px 4px -2px rgba(0, 0, 0, 0.8),
+      0 16px 40px -24px rgba(0, 0, 0, 1);
+    /*
+     * Las filas y cabeceras de dentro llegan al borde: sin recortar, sus
+     * fondos cuadrarían las esquinas que acabamos de redondear.
+     */
+    overflow: hidden;
+  }
+
+  /*
+   * Apartados con menús flotantes dentro (el selector de categoría de los
+   * movimientos): recortar les cortaría el desplegable, así que se quedan
+   * sin recorte y son ellos los que redondean su última fila.
+   */
+  .panel-overflow {
+    overflow: visible;
+  }
+
+  /* Tira de pestañas del selector de mes: sin barra de scroll visible. */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/*
+ * ── Panel del chat ─────────────────────────────────────────────────────
+ * Entra deslizándose desde el borde derecho para que se lea como una capa
+ * sobre el dashboard, no como un cambio de pantalla.
+ */
+@keyframes drawer-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+.drawer-in {
+  animation: drawer-in 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer-in {
+    animation: none;
+  }
+}
+
+/*
+ * ── Lectura de un ticket ───────────────────────────────────────────────
+ * La llamada al modelo no da progreso, así que la espera se cuenta con
+ * animación: un barrido tipo escáner sobre la foto, una barra indeterminada
+ * y las líneas de la lista que se está montando.
+ */
+
+/* Barrido del escáner sobre la miniatura, de arriba abajo. */
+@keyframes scan-sweep {
+  0%   { transform: translateY(0);      opacity: 0; }
+  12%  {                                opacity: 1; }
+  88%  {                                opacity: 1; }
+  100% { transform: translateY(6rem);   opacity: 0; }
+}
+.scan-sweep {
+  animation: scan-sweep 1.9s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+/* Segmento que va y vuelve: indica actividad, no cuánto queda. */
+@keyframes scan-track {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+.scan-track {
+  animation: scan-track 1.6s ease-in-out infinite;
+}
+
+/* Líneas fantasma de los productos aún por leer. */
+@keyframes scan-ghost {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 0.75; }
+}
+.scan-ghost {
+  animation: scan-ghost 1.4s ease-in-out infinite;
+}
+
+/* Puntos suspensivos que laten uno detrás de otro. */
+@keyframes scan-dot {
+  0%, 60%, 100% { opacity: 0.2; }
+  30%           { opacity: 1; }
+}
+.scan-dot {
+  animation: scan-dot 1.2s ease-in-out infinite;
+}
+.scan-dot:nth-child(2) { animation-delay: 0.15s; }
+.scan-dot:nth-child(3) { animation-delay: 0.3s; }
+
+/* Con movimiento reducido queda el estado, sin el movimiento. */
+@media (prefers-reduced-motion: reduce) {
+  .scan-sweep,
+  .scan-track,
+  .scan-ghost,
+  .scan-dot {
+    animation: none;
+  }
+  .scan-sweep { opacity: 0.6; }
+  .scan-ghost { opacity: 0.5; }
+}

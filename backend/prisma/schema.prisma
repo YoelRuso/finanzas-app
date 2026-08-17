@@ -1,0 +1,187 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model BankSession {
+  id           String    @id @default(uuid())
+  sessionId    String    @unique
+  aspspName    String
+  aspspCountry String
+  validUntil   DateTime
+  createdAt    DateTime  @default(now())
+  accounts     Account[]
+}
+
+model Account {
+  id            String        @id @default(uuid())
+  uid           String        @unique
+  iban          String?
+  name          String?
+  // Nombre que le pone el usuario ("Nómina", "Ahorro"). Gana sobre `name`,
+  // que el banco suele devolver genérico o vacío.
+  alias         String?
+  currency      String?
+  bankSessionId String
+  bankSession   BankSession   @relation(fields: [bankSessionId], references: [id])
+  transactions  Transaction[]
+  createdAt     DateTime      @default(now())
+}
+
+model Transaction {
+  id             Int      @id @default(autoincrement())
+  entryReference String?  @unique
+  date           DateTime
+  description    String
+  amount         Float
+  creditDebit    String
+  currency       String   @default("EUR")
+  category       String?
+  // true cuando el usuario ha fijado la categoría a mano:
+  // la sincronización ya no la sobrescribe.
+  categoryManual Boolean  @default(false)
+  // Traspaso entre dos cuentas propias: el dinero no sale del patrimonio,
+  // así que no cuenta como gasto ni como ingreso en ningún resumen.
+  isTransfer     Boolean  @default(false)
+  // Movimiento espejo en la otra cuenta, cuando se ha detectado el par.
+  transferPairId Int?
+  // true cuando el usuario ha decidido a mano si es traspaso o no:
+  // el detector automático ya no lo toca.
+  transferManual Boolean  @default(false)
+  accountId      String
+  account        Account  @relation(fields: [accountId], references: [id])
+  rawData        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  // Ticket de compra que desglosa este movimiento (si se ha escaneado).
+  receipt        Receipt?
+}
+
+// Ticket de compra fotografiado. Desglosa un movimiento bancario en las
+// líneas reales del ticket; si no hay movimiento que le corresponda
+// (compra en efectivo) queda como gasto propio.
+model Receipt {
+  id       Int      @id @default(autoincrement())
+  merchant String
+  date     DateTime
+  total    Float
+  currency String   @default("EUR")
+  // Ruta relativa dentro de backend/uploads/receipts.
+  imagePath String?
+  // 'auto'   → emparejado solo con un movimiento
+  // 'manual' → el usuario eligió el movimiento
+  // 'none'   → sin movimiento (efectivo, o aún sin emparejar)
+  matchStatus String @default("none")
+  // Aviso de la IA cuando el ticket sale mal (borroso, cortado…).
+  warning     String?
+  model       String?
+  rawData     String?
+
+  transactionId Int?         @unique
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  items     ReceiptItem[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([date])
+}
+
+// Una línea del ticket: un producto con su subcategoría.
+model ReceiptItem {
+  id        Int     @id @default(autoincrement())
+  receiptId Int
+  receipt   Receipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+
+  name        String
+  quantity    Float   @default(1)
+  unitPrice   Float?
+  total       Float
+  subcategory String
+  // true cuando el usuario ha corregido la subcategoría a mano.
+  manual      Boolean @default(false)
+
+  @@index([receiptId])
+}
+
+// Reglas propias producto → subcategoría, aprendidas de las correcciones
+// del usuario. Se aplican después de la IA, y ganan sobre ella.
+model ProductRule {
+  id          Int      @id @default(autoincrement())
+  keyword     String   @unique
+  subcategory String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Consejos generados por la IA, cacheados por mes.
+// `dataHash` resume los datos con los que se generaron: si cambian
+// (nueva sincronización, recategorización), el consejo queda obsoleto.
+model AiAdvice {
+  id        Int      @id @default(autoincrement())
+  month     String
+  // "all" = consejo sobre todas las cuentas; si no, el id de la cuenta.
+  // Es un centinela y no un null porque Prisma no admite null en los
+  // `where` de índices únicos compuestos.
+  accountScope String @default("all")
+  content   String
+  dataHash  String
+  model     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([month, accountScope])
+}
+
+// Historial del chat con la IA. Un único hilo: al ser una app de un solo
+// usuario no hay conversaciones que separar, y tener un hilo continuo es
+// justamente lo que permite preguntar "¿y el mes pasado?" sin repetirse.
+model ChatMessage {
+  id      Int    @id @default(autoincrement())
+  // 'user' o 'assistant'.
+  role    String
+  content String
+  // Mes y cuenta que se estaban viendo al escribir el mensaje. Se guardan
+  // para poder enseñar en el hilo sobre qué datos se preguntaba; el modelo
+  // recibe siempre el contexto del mensaje actual, no el de los antiguos.
+  month        String?
+  accountScope String  @default("all")
+  // Modelo que respondió. Null en los mensajes del usuario.
+  model     String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// Reglas de categorización propias del usuario.
+// Se evalúan antes que las reglas por defecto del categorizador.
+model CategoryRule {
+  id        Int      @id @default(autoincrement())
+  keyword   String   @unique
+  category  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Ajustes sueltos de la app, clave → valor. Al ser de un único usuario no
+// hace falta más: el presupuesto mensual vive aquí como "monthlyBudget".
+// En la base de datos porque se consulta también desde el móvil.
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model FixedExpense {
+  id        Int      @id @default(autoincrement())
+  name      String
+  amount    Float
+  category  String?
+  icon      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

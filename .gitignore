@@ -1,0 +1,38 @@
+# ── Dependencias y compilados ──────────────────────────────────
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# ── Secretos ───────────────────────────────────────────────────
+# El .env lleva la clave de Gemini y la ruta de la clave del banco.
+.env
+.env.*
+!.env.example
+
+# Claves privadas de Enable Banking: quien las tenga puede firmar
+# peticiones en nombre de esta aplicación.
+*.pem
+*.key
+*.p12
+backend/keys/
+
+# ── Datos personales ───────────────────────────────────────────
+# La base de datos local guarda los movimientos bancarios reales,
+# con IBANes y nombres de personas. Nunca sale de esta máquina.
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Fotos de tickets de compra.
+backend/uploads/
+
+# ── Entorno de trabajo ─────────────────────────────────────────
+.claude/settings.local.json
+*.tmp.js
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
