@@ -24,6 +24,15 @@ const fmtAmount = new Intl.NumberFormat('es-ES', {
 
 const fmtDate = new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: 'short' })
 
+/** Movimientos que se pintan de entrada, y cuántos añade cada «ver más». */
+const PAGE = 15
+
+/** Para que "alimentacion" encuentre "Alimentación". */
+function normalize(text: string): string {
+  // NFD separa la tilde de la letra y el rango borra las tildes sueltas.
+  return text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+}
+
 export default function TransactionList({
   accounts,
   month,
@@ -31,6 +40,9 @@ export default function TransactionList({
 }: Props) {
   const queryClient = useQueryClient()
   const [openPicker, setOpenPicker] = useState<number | null>(null)
+  const [search, setSearch] = useState('')
+  /** Cuántos se enseñan ahora mismo. Crece con «ver más». */
+  const [visible, setVisible] = useState(PAGE)
   const containerRef = useRef<HTMLElement>(null)
 
   const { dateFrom, dateTo, label: monthLabel, isCurrent } = monthRange(month)
@@ -42,6 +54,23 @@ export default function TransactionList({
   })
 
   const transactions = data?.transactions ?? []
+
+  // La búsqueda mira el concepto y la categoría: "mercadona" y "alimentación"
+  // llevan los dos a la misma compra.
+  const needle = normalize(search.trim())
+  const filtered = needle
+    ? transactions.filter(
+        (tx) =>
+          normalize(tx.description).includes(needle) ||
+          normalize(categoryLabel(tx.category)).includes(needle)
+      )
+    : transactions
+
+  const shown = filtered.slice(0, visible)
+  const hasMore = filtered.length > visible
+
+  // Cambiar de mes, de cuenta o de búsqueda vuelve a empezar por arriba.
+  useEffect(() => setVisible(PAGE), [dateFrom, accountId, search])
 
   // Con varias cuentas a la vista hace falta saber de cuál es cada movimiento;
   // dentro de una sola cuenta, repetirlo en cada línea sobra.
@@ -104,9 +133,21 @@ export default function TransactionList({
       allowOverflow
       actions={
         transactions.length > 0 ? (
-          <span className="font-mono text-[11px] text-dust">
-            {transactions.length} movimientos
-          </span>
+          <>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar…"
+              aria-label="Buscar en los movimientos"
+              className="w-28 sm:w-44 bg-void border border-wall focus:border-fog px-2.5 py-1 font-mono text-[11px] text-stone placeholder:text-dust outline-none transition-colors"
+            />
+            <span className="font-mono text-[11px] text-dust tabular-nums">
+              {needle
+                ? `${filtered.length} de ${transactions.length}`
+                : `${transactions.length} movimientos`}
+            </span>
+          </>
         ) : undefined
       }
     >
@@ -138,10 +179,19 @@ export default function TransactionList({
         </div>
       )}
 
+      {/* la búsqueda no encuentra nada */}
+      {transactions.length > 0 && filtered.length === 0 && (
+        <div className="px-6 py-12 text-center">
+          <p className="font-mono text-sm text-dust">
+            Nada coincide con «{search.trim()}»
+          </p>
+        </div>
+      )}
+
       {/* list */}
-      {transactions.length > 0 && (
+      {shown.length > 0 && (
         <div>
-          {transactions.map((tx) => {
+          {shown.map((tx) => {
             const isDebit = tx.amount < 0
             const date = new Date(tx.date)
             const dateStr = fmtDate.format(date).toUpperCase()
@@ -152,9 +202,11 @@ export default function TransactionList({
             return (
               <div
                 key={tx.id}
-                // Este panel no recorta, así que la última fila redondea su
-                // propio fondo para no cuadrar las esquinas de abajo.
-                className="flex items-center gap-3 px-6 py-3 border-b border-wall last:border-b-0 last:rounded-b-[15px] hover:bg-shell transition-colors"
+                // Este panel no recorta, así que quien cierre la lista
+                // redondea su propio fondo: la última fila, o el «ver más».
+                className={`flex items-center gap-3 px-6 py-3 border-b border-wall last:border-b-0 hover:bg-shell transition-colors ${
+                  hasMore ? '' : 'last:rounded-b-[15px]'
+                }`}
               >
                 {/* date */}
                 <span className="font-mono text-[11px] text-dust shrink-0 w-14">
@@ -246,6 +298,16 @@ export default function TransactionList({
               </div>
             )
           })}
+
+          {/* La lista entera medía más de un tercio de la página. */}
+          {hasMore && (
+            <button
+              onClick={() => setVisible((v) => v + PAGE)}
+              className="w-full px-6 py-3 border-t border-wall rounded-b-[15px] font-mono text-[11px] tracking-widest uppercase text-fog hover:text-stone hover:bg-shell transition-colors"
+            >
+              Ver más — quedan {filtered.length - visible}
+            </button>
+          )}
         </div>
       )}
     </Section>

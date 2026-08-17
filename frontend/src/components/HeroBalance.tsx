@@ -1,6 +1,6 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { api, type Account } from '../api'
-import { monthKey, monthKeyToDate, addMonths } from '../month'
+import { monthKey, monthKeyToDate, addMonths, monthRange, toLocalDate } from '../month'
 import { accountLabel } from '../account'
 import Sparkline from './Sparkline'
 
@@ -56,6 +56,30 @@ export default function HeroBalance({ accounts, month, accountId }: Props) {
     queryFn: () => api.getMonths(accountId),
   })
 
+  /*
+   * Comparar un mes a medias contra el mes anterior entero siempre da un
+   * "vas mejor" falso: el día 17 son 17 días contra 31. Cuando el mes está
+   * en curso, el rival es el mismo tramo del mes anterior.
+   */
+  const { elapsedDays, daysInMonth, isCurrent } = monthRange(month)
+  const partial = isCurrent && elapsedDays < daysInMonth
+
+  const previousStart = addMonths(month, -1)
+  const previousRange = monthRange(previousStart)
+  // Si el mes anterior es más corto (febrero), se compara hasta donde llega.
+  const sameDays = Math.min(elapsedDays, previousRange.daysInMonth)
+  const previousTo = toLocalDate(
+    new Date(previousStart.getFullYear(), previousStart.getMonth(), sameDays)
+  )
+
+  const { data: previousPartial } = useQuery({
+    // Misma forma de clave que el resto del panel: si el tramo ya se ha
+    // pedido para otra cosa, sale de caché.
+    queryKey: ['summary', previousRange.dateFrom, previousTo, accountId ?? 'all'],
+    queryFn: () => api.getSummary(previousRange.dateFrom, previousTo, accountId),
+    enabled: partial && accounts.length > 0,
+  })
+
   const hasAccounts = accounts.length > 0
   const allLoaded = balanceQueries.every((q) => !q.isLoading)
   const anyError = balanceQueries.some((q) => q.isError)
@@ -74,14 +98,19 @@ export default function HeroBalance({ accounts, month, accountId }: Props) {
   const recent = months.slice(0, 6).reverse()
   const sparkValues = recent.map((m) => m.spent)
 
-  // Comparativa del mes seleccionado con el anterior.
+  // Comparativa del mes seleccionado con el anterior, tramo contra tramo.
   const selectedKey = monthKey(month)
-  const previousKey = monthKey(addMonths(month, -1))
+  const previousKey = monthKey(previousStart)
   const selected = months.find((m) => m.month === selectedKey)
   const previous = months.find((m) => m.month === previousKey)
+
+  const previousSpent = partial
+    ? (previousPartial?.summary.reduce((sum, c) => sum + c.total, 0) ?? null)
+    : (previous?.spent ?? null)
+
   const delta =
-    selected && previous && previous.spent > 0
-      ? ((selected.spent - previous.spent) / previous.spent) * 100
+    selected && previousSpent !== null && previousSpent > 0
+      ? ((selected.spent - previousSpent) / previousSpent) * 100
       : null
   // Gastar menos que el mes anterior es la buena noticia.
   const spendingDown = delta !== null && delta < 0
@@ -151,7 +180,10 @@ export default function HeroBalance({ accounts, month, accountId }: Props) {
                     {delta.toFixed(0)}%
                   </span>
                   <span className="font-mono text-[11px] text-dust">
+                    {/* Decir contra qué se compara evita leer un −31 % como
+                        una mejora cuando solo van 17 días de mes. */}
                     vs. {monthName(previousKey)}
+                    {partial && ` · días 1–${sameDays}`}
                   </span>
                 </>
               ) : (

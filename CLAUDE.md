@@ -46,8 +46,9 @@ Dos vistas, sin router ni dependencias añadidas: `Dashboard.tsx` es el
 armazón (cabecera, cuenta activa, mes) y cambia el cuerpo según la ruta,
 con `pushState` + `popstate`, así que recargar y el botón de atrás funcionan.
 
-- `/` — **el panel**, solo lectura: saldo, evolución diaria, gasto por
-  categoría, tickets, consejos y movimientos. Nada que se edite vive aquí.
+- `/` — **el panel**, solo lectura: saldo, entra y sale (ingresos, gastos y lo
+  que queda del mes), evolución diaria, gasto por categoría, tickets, consejos
+  y movimientos. Nada que se edite vive aquí.
 - `/gestion` — **mantenimiento** (`pages/Management.tsx`): clasificar lo que
   quedó en «otros» y la lista de gastos fijos. Ocupan mucho y se miran poco,
   así que fuera del panel. El enlace de la cabecera lleva un contador de

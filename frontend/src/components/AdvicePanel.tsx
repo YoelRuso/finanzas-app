@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type Account, type AdvicePoint, type AdviceEngine } from '../api'
 import { monthRange, monthKey } from '../month'
@@ -109,6 +109,8 @@ export default function AdvicePanel({
 }: Props) {
   const queryClient = useQueryClient()
   const [engine, setEngine] = useState<AdviceEngine>('local')
+  /** Enseñar igualmente un análisis viejo, si el usuario insiste. */
+  const [showStale, setShowStale] = useState(false)
   const { label: monthLabel } = monthRange(month)
   const key = monthKey(month)
 
@@ -130,6 +132,16 @@ export default function AdvicePanel({
 
   const advice = data?.advice ?? null
   const isStale = data?.stale ?? false
+
+  // Al cambiar de mes o de cuenta se vuelve a esconder lo viejo.
+  useEffect(() => setShowStale(false), [key, accountId])
+
+  /*
+   * Un análisis obsoleto cita cifras concretas que ya no son ciertas, y en
+   * pantalla pesan mucho más que el avisito de encima. Se guarda hasta que se
+   * pida verlo: mejor un hueco que números de hace dos semanas.
+   */
+  const hideStale = isStale && !showStale && !generate.isPending
 
   return (
     <Section
@@ -182,10 +194,27 @@ export default function AdvicePanel({
     >
       {/* aviso de datos obsoletos */}
       {advice && isStale && !generate.isPending && (
-        <div className="px-6 py-2.5 border-b border-wall bg-brass/[0.07]">
+        <div className="px-6 py-4 flex flex-wrap items-center gap-x-5 gap-y-2 bg-brass/[0.07] border-b border-wall">
           <span className="font-mono text-[11px] text-brass">
-            Los movimientos han cambiado desde que se generó este análisis
+            Análisis de{' '}
+            {data?.generatedAt ? fmtDateTime.format(new Date(data.generatedAt)) : 'otro momento'}
+            {' '}— los movimientos han cambiado desde entonces
           </span>
+
+          <div className="flex items-center gap-5 ml-auto shrink-0">
+            <button
+              onClick={() => generate.mutate()}
+              className="font-mono text-[11px] tracking-widest uppercase text-brass hover:text-stone transition-colors border-b border-brass/40 hover:border-stone pb-px"
+            >
+              Analizar de nuevo
+            </button>
+            <button
+              onClick={() => setShowStale((v) => !v)}
+              className="font-mono text-[11px] text-dust hover:text-fog transition-colors"
+            >
+              {showStale ? 'ocultar el viejo' : 'ver el viejo'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -232,7 +261,7 @@ export default function AdvicePanel({
       )}
 
       {/* contenido */}
-      {advice && !generate.isPending && (
+      {advice && !generate.isPending && !hideStale && (
         <div>
           {/* resumen */}
           <div className="px-6 py-6 border-b border-wall">

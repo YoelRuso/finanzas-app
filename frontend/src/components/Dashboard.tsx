@@ -15,6 +15,7 @@ import RecentTransactions from './RecentTransactions'
 import AccountBalances from './AccountBalances'
 import AccountSwitcher from './AccountSwitcher'
 import Receipts from './Receipts'
+import MonthFlow from './MonthFlow'
 import ChatDrawer from './ChatDrawer'
 import Management from '../pages/Management'
 import { accountLabel } from '../account'
@@ -22,6 +23,7 @@ import { accountLabel } from '../account'
 /** Apartados del índice lateral, en el mismo orden en que se pintan. */
 const NAV_ITEMS: NavItem[] = [
   { id: 'saldo', label: 'Saldo' },
+  { id: 'flujo', label: 'Entra y sale' },
   { id: 'evolucion', label: 'Evolución' },
   { id: 'gasto', label: 'Gasto' },
   { id: 'tickets', label: 'Tickets' },
@@ -231,6 +233,9 @@ export default function Dashboard({ justConnected, onConnectedAck }: Props) {
                 <MonthSelector month={month} onChange={setMonth} accountId={accountFilter} />
               )}
 
+              {/* ── Entra, sale y queda ────────────────── */}
+              <MonthFlow accounts={shown} month={month} accountId={accountFilter} />
+
               {/* ── Evolución diaria del gasto ─────────── */}
               <MonthlyTrend accounts={shown} month={month} accountId={accountFilter} />
 
@@ -247,8 +252,14 @@ export default function Dashboard({ justConnected, onConnectedAck }: Props) {
               <TransactionList accounts={shown} month={month} accountId={accountFilter} />
             </main>
 
-            {/* ── Fichas laterales ────────────────────────── */}
-            <aside className="hidden 2xl:block sticky top-[76px] space-y-5 max-h-[calc(100vh-96px)] overflow-y-auto no-scrollbar">
+            {/*
+              ── Fichas laterales ──────────────────────────
+              Por debajo de 2xl no se ocultan: caen debajo del panel en dos
+              columnas. Ritmo es el único sitio donde se pone el presupuesto
+              y Cuentas el único donde se renombran, así que esconderlas
+              dejaba esas dos funciones fuera del alcance en un portátil.
+            */}
+            <aside className="grid gap-5 md:grid-cols-2 items-start 2xl:grid-cols-1 2xl:sticky 2xl:top-[76px] 2xl:max-h-[calc(100vh-96px)] 2xl:overflow-y-auto no-scrollbar">
               <SpendingPace accounts={shown} month={month} accountId={accountFilter} />
               <RecentTransactions accounts={shown} accountId={accountFilter} />
               <AccountBalances
