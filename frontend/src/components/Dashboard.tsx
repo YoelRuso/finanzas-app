@@ -144,8 +144,10 @@ export default function Dashboard({ justConnected, onConnectedAck }: Props) {
   return (
     <div className="relative z-10 min-h-screen font-sans">
       {/* ── Header ──────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 flex items-center gap-4 sm:gap-6 px-4 sm:px-6 h-14 border-b border-wall bg-void/85 backdrop-blur-md">
-        <span className="font-mono text-[12px] tracking-[0.3em] uppercase text-stone shrink-0">
+      <header className="sticky top-0 z-30 flex items-center gap-3 sm:gap-6 px-4 sm:px-6 h-14 border-b border-wall bg-void/85 backdrop-blur-md">
+        {/* El espaciado del rótulo se recorta en el móvil: cada píxel que se
+            queda aquí se lo quita a la cuenta activa, que sí es un control. */}
+        <span className="font-mono text-[12px] tracking-[0.2em] sm:tracking-[0.3em] uppercase text-stone shrink-0">
           Finanzas
         </span>
 
@@ -154,7 +156,7 @@ export default function Dashboard({ justConnected, onConnectedAck }: Props) {
           <AccountSwitcher accounts={accounts} value={accountId} onChange={setAccountId} />
         </div>
 
-        <div className="flex items-center gap-4 sm:gap-6 shrink-0">
+        <div className="flex items-center gap-3 sm:gap-6 shrink-0">
           {/*
             Un único enlace que alterna, en vez de un menú: solo hay dos
             vistas y así la cabecera sigue cabiendo en el móvil.
@@ -183,9 +185,26 @@ export default function Dashboard({ justConnected, onConnectedAck }: Props) {
 
           <button
             onClick={() => setShowConnect(true)}
-            className="font-mono text-[11px] tracking-[0.12em] uppercase text-fog hover:text-stone border border-wall hover:border-fog px-4 py-1.5 transition-colors"
+            title="Conectar otro banco"
+            aria-label={accounts.length === 0 ? 'Conectar banco' : 'Conectar otro banco'}
+            className="font-mono text-[11px] tracking-[0.12em] uppercase text-fog hover:text-stone border border-wall hover:border-fog px-3 sm:px-4 py-1.5 transition-colors"
           >
-            {accounts.length === 0 ? 'Conectar banco' : '+ Banco'}
+            {/*
+              Con bancos ya conectados, en el móvil se queda en el signo: es
+              la acción más rara de la cabecera y los 45 px que suelta son los
+              que le faltan al nombre de la cuenta activa para no cortarse.
+              Sin ninguna cuenta sí es la acción principal, y va con nombre.
+            */}
+            {accounts.length === 0 ? (
+              'Conectar banco'
+            ) : (
+              <>
+                <span className="sm:hidden" aria-hidden="true">
+                  +
+                </span>
+                <span className="hidden sm:inline">+ Banco</span>
+              </>
+            )}
           </button>
         </div>
       </header>
@@ -195,7 +214,9 @@ export default function Dashboard({ justConnected, onConnectedAck }: Props) {
         para los laterales sin estrangular el contenido, así que se ocultan y
         la columna central vuelve a centrarse con su ancho máximo de lectura.
       */}
-      <div className="mx-auto w-full max-w-[1700px] px-4 sm:px-6 py-6 sm:py-8">
+      {/* El hueco de abajo en el móvil es para el botón de preguntar: sin él
+          tapa la última fila de la última ficha, que ya no se puede leer. */}
+      <div className="mx-auto w-full max-w-[1700px] px-4 sm:px-6 py-6 sm:py-8 pb-24 sm:pb-8">
         {/* ── Consentimiento caducado ─────────────────────── */}
         {expiredSessions.length > 0 && (
           <div className="w-full max-w-[1150px] mx-auto 2xl:max-w-none mb-5 px-6 py-3 rounded-2xl border border-rust/40 bg-rust/[0.06] flex items-center justify-between gap-4">
@@ -236,6 +257,16 @@ export default function Dashboard({ justConnected, onConnectedAck }: Props) {
               {/* ── Entra, sale y queda ────────────────── */}
               <MonthFlow accounts={shown} month={month} accountId={accountFilter} />
 
+              {/*
+                En el móvil el ritmo del mes sube aquí. Abajo, en las fichas
+                laterales, quedaba a 4.000 px de scroll —detrás de los 33
+                movimientos—, y es justo lo que se mira para saber si el mes
+                va bien. Se pinta en un sitio o en el otro, nunca en los dos.
+              */}
+              <div className="md:hidden">
+                <SpendingPace accounts={shown} month={month} accountId={accountFilter} />
+              </div>
+
               {/* ── Evolución diaria del gasto ─────────── */}
               <MonthlyTrend accounts={shown} month={month} accountId={accountFilter} />
 
@@ -260,8 +291,17 @@ export default function Dashboard({ justConnected, onConnectedAck }: Props) {
               dejaba esas dos funciones fuera del alcance en un portátil.
             */}
             <aside className="grid gap-5 md:grid-cols-2 items-start 2xl:grid-cols-1 2xl:sticky 2xl:top-[76px] 2xl:max-h-[calc(100vh-96px)] 2xl:overflow-y-auto no-scrollbar">
-              <SpendingPace accounts={shown} month={month} accountId={accountFilter} />
-              <RecentTransactions accounts={shown} accountId={accountFilter} />
+              <div className="hidden md:block">
+                <SpendingPace accounts={shown} month={month} accountId={accountFilter} />
+              </div>
+              {/*
+                Los últimos movimientos son un atajo para no bajar hasta la
+                sección de Movimientos. En el móvil no hay tal atajo: caen
+                justo después de esa misma lista, repitiendo lo recién leído.
+              */}
+              <div className="hidden md:block">
+                <RecentTransactions accounts={shown} accountId={accountFilter} />
+              </div>
               <AccountBalances
                 sessions={sessions}
                 month={month}
@@ -282,12 +322,16 @@ export default function Dashboard({ justConnected, onConnectedAck }: Props) {
         ── Chat ─────────────────────────────────────────
         Flotante y no un apartado más: preguntar por una gráfica sin dejar
         de verla es justo lo que lo hace útil.
+
+        En el móvil se queda en el icono: flota sobre la página, y con el
+        rótulo tapaba media fila de la lista que hubiera debajo.
       */}
       {accounts.length > 0 && !showChat && (
         <button
           onClick={() => setShowChat(true)}
           title="Preguntar sobre tus datos (Ctrl + K)"
-          className="fixed bottom-5 left-5 z-30 flex items-center gap-2 bg-shell border border-wall hover:border-fog rounded-full px-4 py-2.5 font-mono text-[11px] tracking-[0.12em] uppercase text-fog hover:text-stone transition-colors shadow-lg"
+          aria-label="Preguntar sobre tus datos"
+          className="fixed bottom-5 left-5 z-30 flex items-center gap-2 bg-shell border border-wall hover:border-fog rounded-full p-3 sm:px-4 sm:py-2.5 font-mono text-[11px] tracking-[0.12em] uppercase text-fog hover:text-stone transition-colors shadow-lg"
         >
           <svg
             viewBox="0 0 24 24"
@@ -296,12 +340,12 @@ export default function Dashboard({ justConnected, onConnectedAck }: Props) {
             strokeWidth={2}
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="w-3.5 h-3.5"
+            className="w-5 h-5 sm:w-3.5 sm:h-3.5"
             aria-hidden="true"
           >
             <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.2A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z" />
           </svg>
-          Preguntar
+          <span className="hidden sm:inline">Preguntar</span>
         </button>
       )}
 

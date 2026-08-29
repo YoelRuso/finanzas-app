@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api, type Account } from '../api'
 import Section from './Section'
+import { conceptLabel } from '../description'
 
 interface Props {
   accounts: Account[]
@@ -81,7 +82,7 @@ export default function RecentTransactions({ accounts, accountId }: Props) {
               </span>
             </div>
             <p className="mt-0.5 font-sans text-[12px] text-fog truncate" title={tx.description}>
-              {tx.description}
+              {conceptLabel(tx.description)}
             </p>
           </div>
         ))}

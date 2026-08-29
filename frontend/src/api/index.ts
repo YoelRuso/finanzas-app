@@ -186,6 +186,27 @@ export interface FixedExpense {
   amount: number
   category: string | null
   icon: string | null
+  /** Comercio del que salió, si se confirmó desde una propuesta. */
+  sourceKey: string | null
+}
+
+/**
+ * Gasto fijo que el detector ha encontrado en el histórico y todavía no está
+ * en la lista. Es una propuesta: hasta que no se confirma no existe nada.
+ */
+export interface RecurringSuggestion {
+  key: string
+  name: string
+  sample: string
+  amount: number
+  minAmount: number
+  maxAmount: number
+  category: string
+  count: number
+  everyDays: number
+  firstDate: string
+  lastDate: string
+  confidence: 'alta' | 'media'
 }
 
 /** Una línea de un ticket: un producto con su subcategoría. */
@@ -415,12 +436,40 @@ export const api = {
   getFixedExpenses: () =>
     apiFetch<{ fixedExpenses: FixedExpense[]; total: number }>('/fixed-expenses'),
 
-  createFixedExpense: (data: { name: string; amount: number; category?: string; icon?: string }) =>
+  createFixedExpense: (data: {
+    name: string
+    amount: number
+    category?: string
+    icon?: string
+    /** Comercio del que viene, al confirmar una propuesta del detector. */
+    sourceKey?: string
+  }) =>
     apiFetch<{ expense: FixedExpense }>('/fixed-expenses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }),
+
+  /** Gastos fijos que el histórico delata y aún no están en la lista. */
+  getRecurringSuggestions: (accountId?: string) =>
+    apiFetch<{ suggestions: RecurringSuggestion[] }>(
+      `/fixed-expenses/suggestions${accountId ? `?accountId=${accountId}` : ''}`
+    ),
+
+  /** "Esto no es un gasto fijo": no se vuelve a proponer. */
+  dismissRecurring: (key: string) =>
+    apiFetch<{ dismissed: string }>('/fixed-expenses/dismissals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    }),
+
+  /** Deshace el descarte. */
+  restoreRecurring: (key: string) =>
+    apiFetch<{ restored: boolean }>(
+      `/fixed-expenses/dismissals/${encodeURIComponent(key)}`,
+      { method: 'DELETE' }
+    ),
 
   updateFixedExpense: (id: number, data: { name?: string; amount?: number; category?: string; icon?: string }) =>
     apiFetch<{ expense: FixedExpense }>(`/fixed-expenses/${id}`, {

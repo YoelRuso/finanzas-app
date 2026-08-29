@@ -50,12 +50,56 @@ con `pushState` + `popstate`, así que recargar y el botón de atrás funcionan.
   que queda del mes), evolución diaria, gasto por categoría, tickets, consejos
   y movimientos. Nada que se edite vive aquí.
 - `/gestion` — **mantenimiento** (`pages/Management.tsx`): clasificar lo que
-  quedó en «otros» y la lista de gastos fijos. Ocupan mucho y se miran poco,
-  así que fuera del panel. El enlace de la cabecera lleva un contador de
-  movimientos sin clasificar.
+  quedó en «otros», los gastos fijos que el histórico delata y la lista de
+  gastos fijos. Ocupan mucho y se miran poco, así que fuera del panel. El
+  enlace de la cabecera lleva un contador de movimientos sin clasificar.
+  Las propuestas van justo encima de la lista a la que alimentan y solo se
+  pintan cuando hay algo que proponer: es una tarea, no un panel fijo.
 
 Ojo si se sirve en producción: `/gestion` necesita que el servidor devuelva
 `index.html` (el dev server de Vite ya lo hace).
+
+### En el móvil
+
+La app se abre desde el móvil (los tickets se fotografían allí), así que el
+ancho de referencia son 390 px. Tres sitios donde eso obliga a cambiar de
+forma, no solo a encoger:
+
+- **Cabecera:** en la fila solo caben tres cosas. Por debajo de `sm`, el
+  selector de cuenta pasa de tira de píldoras a desplegable (enseña solo la
+  activa) y «+ Banco» se queda en el signo — salvo sin ninguna cuenta, que es
+  la acción principal y va con nombre. Con las píldoras, las cuentas quedaban
+  detrás de un scroll horizontal sin barra: invisibles.
+- **Cabecera de apartado (`Section`):** envuelve. El título no se encoge, así
+  que sin envolver se salía por encima de sus propios controles.
+- **Filas de importes:** lo que no cabe baja a su línea (el aviso de «supera
+  los ingresos» del gasto por categoría). Encogerlo empujaba el importe fuera
+  del panel, que además recorta.
+- **Orden:** por debajo de `md`, «Ritmo» sube al cuerpo (justo tras «Entra y
+  sale») y «Últimos» se oculta. En la columna lateral, Ritmo quedaba a 4.000
+  px de scroll —detrás de los 33 movimientos— y Últimos repetía la lista que
+  se acababa de leer. Ritmo se pinta en un sitio o en el otro, nunca en los
+  dos: `md:hidden` arriba, `hidden md:block` en el lateral.
+- **Concepto de un movimiento:** dos líneas (`line-clamp-2`), y sin el
+  prefijo del banco (`src/description.ts`). «Pago en» encabeza 264 de cada
+  500 movimientos y el signo del importe ya dice si se pagó o se cobró, así
+  que se quita al pintarlo; «Bizum enviado a» y compañía se quedan en
+  «Bizum ·». Es solo presentación: en la base de datos, en el buscador y en
+  el `title` de la fila sigue el texto tal cual lo manda el banco, y basta
+  borrar una línea de la tabla para que un prefijo vuelva. Lo usan las dos
+  listas de movimientos, el clasificador y los tickets, para que un mismo
+  cargo no se llame de dos maneras distintas según dónde se mire.
+- **Tocar vale por pasar el ratón:** las gráficas responden al clic además de
+  al hover, porque el gasto de un día concreto no está escrito en ningún otro
+  sitio. Lo que sigue siendo solo de ratón son los `title=""`: nada que no se
+  pueda deducir de lo que ya se ve.
+
+Cuidado con Recharts 3: los manejadores de ratón del gráfico ya **no** reciben
+`activePayload`, solo `activeTooltipIndex` —y como cadena—. Al actualizar, la
+cabecera de «Evolución de gasto» y el centro del donut se quedaron mudos sin
+error ninguno. El dato se busca por índice en los datos que se le pasaron
+(`pointAt` / `categoryAt`). Los manejadores puestos en `<Pie>` directamente no
+llegan a dispararse: van en `<PieChart>`.
 
 ## Integración bancaria: Enable Banking
 
@@ -122,6 +166,30 @@ propósito: así se puede preguntar por una gráfica sin dejar de verla.
   `CategoryRule`. La guía del prompt repite el criterio de las reglas por
   defecto (restaurante → ocio, súper → alimentación); si se cambian unas hay
   que cambiar la otra o las sugerencias contradirán a lo ya clasificado.
+
+## Gastos fijos detectados
+
+La lista de gastos fijos se escribía a mano teniendo la respuesta en la base
+de datos. `backend/src/services/recurringDetector.ts` la busca: agrupa los
+gastos de los últimos 200 días por comercio (el mismo `merchantKey` del
+clasificador) y propone los que llegan cada mes por un importe estable.
+
+- **Sin IA ni coste.** Son reglas, como `localAdvisor`: 3 cargos mínimo,
+  todos los huecos entre 24 y 38 días, importe dentro del ±25% de la mediana
+  y último cargo hace menos de 50 días (si no, es una suscripción de baja).
+- **Se exigen *todos* los huecos en rango, no la media.** Es lo que descarta
+  solo a los supermercados, que tienen cargos cada pocos días. El precio es
+  perder las series con un mes saltado: el fallo que interesa tener.
+- **Propone, no escribe** — mismo trato que las reglas de categoría.
+  `GET /fixed-expenses/suggestions` solo lee; el gasto lo crea el `POST` de
+  siempre al confirmar en pantalla, con `sourceKey` = clave del comercio.
+- **No repetir lo ya apuntado:** un gasto escrito a mano se llama "Gimnasio"
+  y el banco cobra "Recibo SOLVENTIA 3 SL", que no se parecen en nada, así
+  que la deduplicación mira **el importe** además del nombre. Ante la duda,
+  callar: un duplicado aceptado suma el cargo dos veces al total de fijos y
+  desajusta la barra de fijos contra variables.
+- **Descartar se recuerda** (`RecurringDismissal`), o cada visita volvería a
+  ofrecer lo mismo. Se puede deshacer desde el aviso.
 
 ## Tickets de compra (desglose de la cesta)
 

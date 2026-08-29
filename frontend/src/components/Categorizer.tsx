@@ -4,6 +4,7 @@ import { api, type Account, type PendingGroup } from '../api'
 import { CATEGORIES, categoryLabel, categoryColor } from '../categories'
 import Section from './Section'
 import CategoryIcon from './CategoryIcon'
+import { conceptLabel } from '../description'
 
 interface Props {
   accounts: Account[]
@@ -295,7 +296,7 @@ export default function Categorizer({ accounts, accountId }: Props) {
 
                   {/* merchant */}
                   <span className="font-sans text-sm text-stone flex-1 truncate">
-                    {group.sample}
+                    {conceptLabel(group.sample)}
                   </span>
 
                   {/* last date */}

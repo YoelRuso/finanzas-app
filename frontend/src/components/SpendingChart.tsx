@@ -107,8 +107,27 @@ export default function SpendingChart({
   const income = monthsData?.months.find((m) => m.month === monthKey)?.income ?? 0
   const overspent = income > 0 && grandTotal > income
 
+  /** Se pinta en dos sitios distintos según el ancho, así que se define una vez. */
+  const overspentBadge = (
+    <Badge
+      tone="alert"
+      title={`Has gastado más de lo que has ingresado este mes (${fmt.format(income)})`}
+    >
+      Supera los {fmt.format(income)} de ingresos
+    </Badge>
+  )
+
   /** Categoría señalada, venga del donut o de la tabla. */
   const hoveredCat = summary.find((c) => c.category === hovered) ?? null
+
+  /** La porción que el donut dice tener señalada, si es que hay alguna. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function categoryAt(state: any): string | null {
+    const raw = state?.activeTooltipIndex
+    if (raw === null || raw === undefined) return null
+    const index = Number(raw)
+    return Number.isInteger(index) && index >= 0 ? (summary[index]?.category ?? null) : null
+  }
 
   return (
     <Section
@@ -162,7 +181,21 @@ export default function SpendingChart({
           <div className="flex flex-col items-center justify-center py-8 px-6">
             <div className="relative w-52 h-52">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
+                {/*
+                  Señalar va en el gráfico, no en cada porción: en Recharts 3
+                  los manejadores del <Pie> no llegan a dispararse. El
+                  gráfico sí dice qué porción está señalada, y como índice
+                  —igual que en la evolución de gasto—. El clic está por el
+                  móvil, donde no hay ratón que pasar por encima.
+                */}
+                <PieChart
+                  onMouseMove={(state) => setHovered(categoryAt(state))}
+                  onMouseLeave={() => setHovered(null)}
+                  onClick={(state) => {
+                    const category = categoryAt(state)
+                    setHovered((prev) => (prev === category ? null : category))
+                  }}
+                >
                   <Pie
                     data={summary}
                     dataKey="total"
@@ -173,8 +206,6 @@ export default function SpendingChart({
                     outerRadius={85}
                     paddingAngle={3}
                     stroke="none"
-                    onMouseEnter={(_, i) => setHovered(summary[i].category)}
-                    onMouseLeave={() => setHovered(null)}
                   >
                     {summary.map((entry) => (
                       <Cell
@@ -282,19 +313,19 @@ export default function SpendingChart({
                 </div>
               )
             })}
+            {/*
+              El aviso de que el mes se pasa de los ingresos no cabe al lado
+              del título en el móvil: entre el hueco del icono, el porcentaje
+              y el importe solo quedan ~130 px, y empujaba el total fuera del
+              panel. A partir de sm sigue donde estaba; por debajo baja a su
+              propia línea, que además es donde se lee.
+            */}
             {/* total row */}
-            <div className="flex items-center gap-4 px-6 py-3.5 bg-pit/50">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5 px-6 py-3.5 bg-pit/50">
               <span className="w-7 shrink-0" />
-              <span className="font-sans text-sm text-fog flex-1 flex items-center gap-2.5 flex-wrap">
+              <span className="font-sans text-sm text-fog flex-1 min-w-0 flex items-center gap-2.5">
                 Total del mes
-                {overspent && (
-                  <Badge
-                    tone="alert"
-                    title={`Has gastado más de lo que has ingresado este mes (${fmt.format(income)})`}
-                  >
-                    Supera los {fmt.format(income)} de ingresos
-                  </Badge>
-                )}
+                {overspent && <span className="hidden sm:inline-flex">{overspentBadge}</span>}
               </span>
               <div className="hidden sm:block w-28" />
               <span className="w-10" />
@@ -305,6 +336,7 @@ export default function SpendingChart({
               >
                 {fmt.format(grandTotal)}
               </span>
+              {overspent && <span className="sm:hidden w-full">{overspentBadge}</span>}
             </div>
           </div>
         </div>

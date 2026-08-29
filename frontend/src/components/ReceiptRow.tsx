@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type Receipt } from '../api'
 import { SUBCATEGORIES, subcategoryLabel, subcategoryColor } from '../subcategories'
+import { conceptLabel } from '../description'
 import Badge from './Badge'
 
 interface Props {
@@ -151,7 +152,7 @@ export default function ReceiptRow({ receipt, onMessage }: Props) {
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="font-mono text-[11px] text-fog">
                   {fmtDate.format(new Date(receipt.transaction.date)).toUpperCase()} ·{' '}
-                  {receipt.transaction.description} ·{' '}
+                  {conceptLabel(receipt.transaction.description)} ·{' '}
                   {fmt.format(Math.abs(receipt.transaction.amount))}
                 </span>
                 <button
@@ -181,7 +182,8 @@ export default function ReceiptRow({ receipt, onMessage }: Props) {
                   <div key={candidate.id} className="flex items-center gap-3">
                     <span className="font-mono text-[11px] text-fog flex-1 truncate">
                       {fmtDate.format(new Date(candidate.date)).toUpperCase()} ·{' '}
-                      {candidate.description} · {fmt.format(Math.abs(candidate.amount))}
+                      {conceptLabel(candidate.description)} ·{' '}
+                      {fmt.format(Math.abs(candidate.amount))}
                     </span>
                     <button
                       onClick={() => link.mutate(candidate.id)}

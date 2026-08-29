@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type Account } from '../api'
 import { CATEGORIES, categoryLabel, categoryColor } from '../categories'
 import { accountLabel } from '../account'
+import { conceptLabel } from '../description'
 import { monthRange } from '../month'
 import Section from './Section'
 import Badge from './Badge'
@@ -215,7 +216,18 @@ export default function TransactionList({
 
                 {/* description */}
                 <div className="flex-1 min-w-0">
-                  <p className="font-sans text-sm text-stone truncate">{tx.description}</p>
+                  {/*
+                    En el móvil el concepto cabe en ~150 px: cortado a una
+                    línea, «Pago en MERCA…» no distingue una compra de otra,
+                    y con los bizums es peor. Se le dejan dos líneas, que es
+                    donde ya se lee el comercio entero.
+                  */}
+                  <p
+                    className="font-sans text-sm text-stone line-clamp-2 sm:line-clamp-none sm:truncate"
+                    title={tx.description}
+                  >
+                    {conceptLabel(tx.description)}
+                  </p>
                   {showAccount && (
                     <p className="font-mono text-[10px] text-dust truncate">
                       {accountLabel(tx.account)}

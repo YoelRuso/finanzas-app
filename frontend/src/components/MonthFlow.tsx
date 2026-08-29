@@ -42,10 +42,18 @@ export default function MonthFlow({ accounts, month, accountId }: Props) {
   const left = Math.round((income - spent) * 100) / 100
   const positive = left >= 0
 
-  // La barra mide cuánto de lo que entró se ha ido. Sin ingresos no hay nada
-  // que consumir: se pinta llena, que es exactamente lo que está pasando.
-  const consumed = income > 0 ? Math.min(100, (spent / income) * 100) : 100
+  // La barra se mide contra la cifra más alta de las dos, no contra los
+  // ingresos: recortada al 100% se pintaba igual pasándote por 1 € que por
+  // 500, que es justo cuando el dato importa. Así el exceso se ve a escala.
+  const scale = Math.max(income, spent)
+  const incomePct = scale > 0 ? (income / scale) * 100 : 0
+  // Verde hasta donde los ingresos cubren el gasto, rojo lo que se pasa.
+  const coveredPct = scale > 0 ? (Math.min(income, spent) / scale) * 100 : 0
+  const excessPct = Math.max(0, (spent / (scale || 1)) * 100 - incomePct)
+
   const savedPct = income > 0 && positive ? Math.round((left / income) * 100) : null
+  // Sin ingresos no hay porcentaje que calcular: el texto de abajo ya lo dice.
+  const overPct = income > 0 && !positive ? Math.round((-left / income) * 100) : null
 
   return (
     <Section id="flujo" title="Entra y sale" subtitle={monthLabel}>
@@ -79,6 +87,7 @@ export default function MonthFlow({ accounts, month, accountId }: Props) {
             </p>
           </div>
 
+          {/* La misma columna en los dos casos: la fila no cambia de forma. */}
           {savedPct !== null && (
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust mb-1">
@@ -87,16 +96,36 @@ export default function MonthFlow({ accounts, month, accountId }: Props) {
               <p className="font-display text-2xl text-fog tabular-nums">{savedPct}%</p>
             </div>
           )}
+
+          {overPct !== null && (
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust mb-1">
+                Te pasaste
+              </p>
+              <p className="font-display text-2xl text-rust tabular-nums">{overPct}%</p>
+            </div>
+          )}
         </div>
 
-        {/* Cuánto de lo que entró se ha ido ya. */}
-        <div className="mt-5 h-2 bg-wall/40 rounded-full overflow-hidden">
+        {/* Lo que se ha ido, medido contra la mayor de las dos cifras. */}
+        <div className="mt-5 relative h-2 bg-wall/40 rounded-full overflow-hidden flex">
           <div
-            className={`h-full rounded-full transition-all duration-500 ${
-              positive ? 'bg-moss' : 'bg-rust'
-            }`}
-            style={{ width: `${consumed}%` }}
+            className="h-full bg-moss transition-all duration-500"
+            style={{ width: `${coveredPct}%` }}
           />
+          <div
+            className="h-full bg-rust transition-all duration-500"
+            style={{ width: `${excessPct}%` }}
+          />
+          {/* Dónde se acabó lo que entró: todo lo que pase de aquí es exceso. */}
+          {!positive && income > 0 && (
+            <span
+              aria-hidden="true"
+              title="Lo que entró este mes"
+              className="absolute top-0 bottom-0 w-px bg-stone/70"
+              style={{ left: `${incomePct}%` }}
+            />
+          )}
         </div>
 
         <p className="font-mono text-[11px] text-dust mt-3 leading-relaxed">

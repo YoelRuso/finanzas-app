@@ -33,7 +33,13 @@ const Section = forwardRef<HTMLElement, Props>(function Section(
       id={id}
       className={`panel scroll-mt-20 ${allowOverflow ? 'panel-overflow' : ''}`}
     >
-      <header className="flex items-center justify-between gap-4 px-6 py-3.5 border-b border-wall">
+      {/*
+        La cabecera envuelve en vez de estrangularse: en el móvil el título y
+        sus controles piden más de los 350 px de ancho, y al no caber el
+        título se salía por encima de los botones. Al envolver, los controles
+        bajan enteros a su propia línea.
+      */}
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-2.5 px-6 py-3.5 border-b border-wall">
         <div className="flex items-center gap-3 min-w-0">
           <span className="w-[2px] h-3.5 bg-brass shrink-0" aria-hidden="true" />
           <h2 className="font-mono text-[11px] tracking-[0.2em] uppercase text-stone whitespace-nowrap">
@@ -43,7 +49,11 @@ const Section = forwardRef<HTMLElement, Props>(function Section(
             <span className="font-mono text-[11px] text-dust truncate">— {subtitle}</span>
           )}
         </div>
-        {actions && <div className="flex items-center gap-4 shrink-0">{actions}</div>}
+        {actions && (
+          <div className="flex grow flex-wrap items-center justify-end gap-x-4 gap-y-2 min-w-0">
+            {actions}
+          </div>
+        )}
       </header>
       {children}
     </section>

@@ -182,6 +182,18 @@ model FixedExpense {
   amount    Float
   category  String?
   icon      String?
+  // Clave de comercio de la que salió (merchantKey), cuando el gasto se
+  // confirmó desde una propuesta del detector. Null si se escribió a mano.
+  // Sirve para no volver a proponer lo que ya está en la lista.
+  sourceKey String?  @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Comercios que el detector propuso como gasto fijo y el usuario descartó.
+// Sin esto cada visita volvería a ofrecer lo mismo: es la única forma de que
+// "no, esto no es un gasto fijo" signifique algo la próxima vez.
+model RecurringDismissal {
+  key         String   @id
+  dismissedAt DateTime @default(now())
 }
