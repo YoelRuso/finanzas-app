@@ -214,6 +214,32 @@ router.delete('/sessions/:id', async (req: Request, res: Response) => {
 // GET /banking/accounts/:uid/balances
 router.get('/accounts/:uid/balances', async (req: Request, res: Response) => {
   try {
+    // Modo demo (DEMO_MODE=1): sin banco real, el saldo sale del saldo inicial
+    // que dejó el seed más la suma de los movimientos de la cuenta.
+    if (process.env.DEMO_MODE === '1') {
+      const account = await prisma.account.findUnique({ where: { uid: req.params.uid } })
+      if (!account) {
+        res.status(404).json({ error: 'Cuenta no encontrada' })
+        return
+      }
+      const opening = await prisma.setting.findUnique({
+        where: { key: `demoOpeningBalance:${account.uid}` },
+      })
+      const moved = await prisma.transaction.aggregate({
+        where: { accountId: account.id },
+        _sum: { amount: true },
+      })
+      const amount = Number(opening?.value ?? 0) + (moved._sum.amount ?? 0)
+      res.json({
+        balances: [
+          {
+            balance_type: 'CLAV',
+            balance_amount: { amount: amount.toFixed(2), currency: 'EUR' },
+          },
+        ],
+      })
+      return
+    }
     const balances = await eb.getBalances(req.params.uid)
     res.json({ balances })
   } catch (err: unknown) {
